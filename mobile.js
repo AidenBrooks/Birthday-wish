@@ -1,13 +1,7 @@
-let highestZ = 1;
-
 class Paper {
   holdingPaper = false;
   touchStartX = 0;
   touchStartY = 0;
-  touchMoveX = 0;
-  touchMoveY = 0;
-  touchEndX = 0;
-  touchEndY = 0;
   prevTouchX = 0;
   prevTouchY = 0;
   velX = 0;
@@ -16,74 +10,62 @@ class Paper {
   currentPaperX = 0;
   currentPaperY = 0;
   rotating = false;
+  initialAngle = 0;
 
   init(paper) {
-    paper.addEventListener('touchmove', (e) => {
+    paper.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 1) {
+        // single finger drag
+        this.holdingPaper = true;
+        paper.style.zIndex = highestZ++;
+        this.touchStartX = e.touches[0].clientX;
+        this.touchStartY = e.touches[0].clientY;
+        this.prevTouchX = this.touchStartX;
+        this.prevTouchY = this.touchStartY;
+      } else if (e.touches.length === 2) {
+        // two-finger rotation
+        this.rotating = true;
+        this.initialAngle = this.getAngle(e.touches);
+      }
+    });
+
+    paper.addEventListener("touchmove", (e) => {
       e.preventDefault();
-      if(!this.rotating) {
-        this.touchMoveX = e.touches[0].clientX;
-        this.touchMoveY = e.touches[0].clientY;
-        
-        this.velX = this.touchMoveX - this.prevTouchX;
-        this.velY = this.touchMoveY - this.prevTouchY;
+
+      if (this.rotating && e.touches.length === 2) {
+        // Handle rotation
+        const angle = this.getAngle(e.touches);
+        this.rotation += angle - this.initialAngle;
+        this.initialAngle = angle;
+      } else if (this.holdingPaper && e.touches.length === 1) {
+        // Handle dragging
+        const touchX = e.touches[0].clientX;
+        const touchY = e.touches[0].clientY;
+
+        this.velX = touchX - this.prevTouchX;
+        this.velY = touchY - this.prevTouchY;
+
+        this.currentPaperX += this.velX;
+        this.currentPaperY += this.velY;
+
+        this.prevTouchX = touchX;
+        this.prevTouchY = touchY;
       }
-        
-      const dirX = e.touches[0].clientX - this.touchStartX;
-      const dirY = e.touches[0].clientY - this.touchStartY;
-      const dirLength = Math.sqrt(dirX*dirX+dirY*dirY);
-      const dirNormalizedX = dirX / dirLength;
-      const dirNormalizedY = dirY / dirLength;
 
-      const angle = Math.atan2(dirNormalizedY, dirNormalizedX);
-      let degrees = 180 * angle / Math.PI;
-      degrees = (360 + Math.round(degrees)) % 360;
-      if(this.rotating) {
-        this.rotation = degrees;
-      }
-
-      if(this.holdingPaper) {
-        if(!this.rotating) {
-          this.currentPaperX += this.velX;
-          this.currentPaperY += this.velY;
-        }
-        this.prevTouchX = this.touchMoveX;
-        this.prevTouchY = this.touchMoveY;
-
-        paper.style.transform = `translateX(${this.currentPaperX}px) translateY(${this.currentPaperY}px) rotateZ(${this.rotation}deg)`;
-      }
-    })
-
-    paper.addEventListener('touchstart', (e) => {
-      if(this.holdingPaper) return; 
-      this.holdingPaper = true;
-      
-      paper.style.zIndex = highestZ;
-      highestZ += 1;
-      
-      this.touchStartX = e.touches[0].clientX;
-      this.touchStartY = e.touches[0].clientY;
-      this.prevTouchX = this.touchStartX;
-      this.prevTouchY = this.touchStartY;
-    });
-    paper.addEventListener('touchend', () => {
-      this.holdingPaper = false;
-      this.rotating = false;
+      paper.style.transform = `translate(${this.currentPaperX}px, ${this.currentPaperY}px) rotate(${this.rotation}deg)`;
     });
 
-    // For two-finger rotation on touch screens
-    paper.addEventListener('gesturestart', (e) => {
-      e.preventDefault();
-      this.rotating = true;
-    });
-    paper.addEventListener('gestureend', () => {
-      this.rotating = false;
+    paper.addEventListener("touchend", (e) => {
+      if (e.touches.length === 0) {
+        this.holdingPaper = false;
+        this.rotating = false;
+      }
     });
   }
+
+  getAngle(touches) {
+    const dx = touches[1].clientX - touches[0].clientX;
+    const dy = touches[1].clientY - touches[0].clientY;
+    return (Math.atan2(dy, dx) * 180) / Math.PI;
+  }
 }
-
-const papers = Array.from(document.querySelectorAll('.paper'));
-
-papers.forEach(paper => {
-  const p = new Paper();
-  p.init(paper);
-});
